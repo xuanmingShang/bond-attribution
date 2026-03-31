@@ -1,0 +1,61 @@
+# API keys – never commit secrets
+fred-api-key.txt
+.env
+.env.*
+!.env.example
+
+# Local python/conda metadata
+.python-version
+.conda/
+
+# Cached data & outputs
+data/
+output/
+
+# Test / cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Streamlit/local app state
+.streamlit/secrets.toml
+
+# Generated documents / temp office files
+~$*.docx
+~$*.doc
+~$*.pptx
+~$*.xlsx
