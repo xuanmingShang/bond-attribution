@@ -6,6 +6,7 @@ Usage:
 """
 from __future__ import annotations
 import sys, os
+from io import StringIO
 from pathlib import Path
 
 # Ensure project root on path
@@ -209,7 +210,7 @@ def load_yields(start: str, end: str):
 @st.cache_data(show_spinner=False)
 def compute_core(ydf_json: str, start: str, end: str,
                  maturity_years: int, coupon: float, face: float, freq: int):
-    ydf = pd.read_json(ydf_json)
+    ydf = pd.read_json(StringIO(ydf_json))
     ch = YieldCurveHistory(ydf)
     sd = pd.Timestamp(start)
     md = sd + pd.DateOffset(years=maturity_years)
@@ -229,11 +230,11 @@ def compute_core(ydf_json: str, start: str, end: str,
 @st.cache_data(show_spinner=False)
 def compute_pca(ydf_json: str, start: str, end: str,
                 bond_spec_json: str, coupon: float, face: float, freq: int):
-    ydf = pd.read_json(ydf_json)
+    ydf = pd.read_json(StringIO(ydf_json))
     ch = YieldCurveHistory(ydf)
     sd = pd.Timestamp(start)
     # Reconstruct bond for PCA attribution
-    bond_info = pd.read_json(bond_spec_json, typ="series")
+    bond_info = pd.read_json(StringIO(bond_spec_json), typ="series")
     bond = BondSpec(
         maturity=bond_info["Maturity"],
         face=face,
@@ -250,7 +251,7 @@ def compute_pca(ydf_json: str, start: str, end: str,
 @st.cache_data(show_spinner=False)
 def compute_ladder(ydf_json: str, start: str, end: str,
                    capital: float, rebal_months: int):
-    ydf = pd.read_json(ydf_json)
+    ydf = pd.read_json(StringIO(ydf_json))
     ch = YieldCurveHistory(ydf)
     fr = ch[start].rate(0.25)
     bt = LadderBacktest(ch, start, end, [2, 5, 7, 10, 30], capital, rebal_months, fr)
