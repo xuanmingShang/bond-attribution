@@ -7,7 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bond_pnl.pca import fit_pca
+from bond_pnl.bond import BondSpec
+from bond_pnl.pca import fit_pca, pca_attribution
 from bond_pnl.yield_curve import YieldCurveHistory, TENOR_YEARS, TENOR_LABELS
 
 
@@ -46,3 +47,30 @@ class TestFitPCA:
         gram = C @ C.T
         off_diag = gram - np.diag(np.diag(gram))
         assert np.allclose(off_diag, 0, atol=1e-10)
+
+
+class TestPCAAttribution:
+    def test_mean_pnl_is_not_exposed_and_identity_holds(self):
+        ch = _random_curve_hist(n_days=90)
+        start = "2023-06-01"
+        end = "2023-09-29"
+        pr = fit_pca(ch, start, end, n_components=3)
+        bond = BondSpec(
+            maturity="2028-06-01",
+            face=100.0,
+            coupon=0.04,
+            freq=2,
+            day_count="ACT/ACT",
+            issue_date=start,
+        )
+
+        attr = pca_attribution(bond, ch, pr, start, end, financing_rate=0.03)
+
+        assert "Mean PnL" not in attr.columns
+        assert {"PC1 PnL", "PC2 PnL", "PC3 PnL", "PC Total", "Residual"}.issubset(attr.columns)
+
+        pc_sum = attr[["PC1 PnL", "PC2 PnL", "PC3 PnL"]].sum(axis=1)
+        assert np.allclose(attr["PC Total"], pc_sum, atol=3e-6)
+
+        explained = attr["Carry"] + attr["PC Total"] + attr["Residual"]
+        assert np.allclose(attr["Actual PnL"], explained, atol=3e-6)

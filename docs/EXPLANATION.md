@@ -409,11 +409,10 @@ PCA 把这些 11 维向量分解为 3 个正交主成分：
 2. 去均值化：$\Delta Y_{\text{centered}} = \Delta Y - \mu$
 3. 投影：$\text{score}_k = \text{loading}_k \cdot \Delta Y_{\text{centered}}$
 4. 逐层重定价：
-   - Mean 层：curve + μ → 重定价 → Mean PnL
-   - PC1 层：curve + μ + score₁ × loading₁ → 重定价 → PC1 PnL
-   - PC2 层：curve + μ + score₁×l₁ + score₂×l₂ → 重定价 → PC2 PnL
+   - PC1 层：curve + score₁ × loading₁ → 重定价 → PC1 PnL
+   - PC2 层：curve + score₁×l₁ + score₂×l₂ → 重定价 → PC2 PnL
    - ...
-5. Residual = Actual − Carry − PC Total
+5. Residual = Actual − Carry − PC Total，其中包含样本均值漂移、未保留 PC 和非线性余项
 
 **代码对应**：`pca.py → pca_attribution()`
 

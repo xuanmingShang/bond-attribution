@@ -495,7 +495,7 @@ def plot_pca_loadings_heatmap(pr) -> go.Figure:
 
 
 def plot_pca_attribution_cum(pa: pd.DataFrame) -> go.Figure:
-    components = ["Carry", "Mean PnL", "PC1 PnL", "PC2 PnL", "PC3 PnL", "Residual", "Actual PnL"]
+    components = ["Carry", "PC1 PnL", "PC2 PnL", "PC3 PnL", "Residual", "Actual PnL"]
     avail = [c for c in components if c in pa.columns]
     cum = pa[avail].cumsum()
     dates = pa["Date"] if "Date" in pa.columns else pa.index
@@ -503,7 +503,6 @@ def plot_pca_attribution_cum(pa: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
     colors = {
         "Carry": COLORS["carry"],
-        "Mean PnL": COLORS["gray"],
         "PC1 PnL": COLORS["pc1"],
         "PC2 PnL": COLORS["pc2"],
         "PC3 PnL": COLORS["pc3"],
@@ -531,7 +530,7 @@ def plot_pca_attribution_cum(pa: pd.DataFrame) -> go.Figure:
 
 def plot_pca_waterfall(pca_attr: pd.DataFrame) -> go.Figure:
     pca_sum = pca_attr.sum()
-    components = ["Carry", "Mean PnL", "PC1 PnL", "PC2 PnL", "PC3 PnL", "Residual"]
+    components = ["Carry", "PC1 PnL", "PC2 PnL", "PC3 PnL", "Residual"]
     vals = [pca_sum.get(c, 0) for c in components]
     actual = pca_sum.get("Actual PnL", sum(vals))
     fig = go.Figure(
@@ -986,7 +985,6 @@ def _render_compare_view(core_summary: pd.Series, pca_attr: pd.DataFrame | None)
             {
                 "Component": [
                     "Carry",
-                    "Mean PnL",
                     "PC1 (Level)",
                     "PC2 (Slope)",
                     "PC3 (Curvature)",
@@ -998,7 +996,6 @@ def _render_compare_view(core_summary: pd.Series, pca_attr: pd.DataFrame | None)
                     pca_summary.get(c, 0)
                     for c in [
                         "Carry",
-                        "Mean PnL",
                         "PC1 PnL",
                         "PC2 PnL",
                         "PC3 PnL",

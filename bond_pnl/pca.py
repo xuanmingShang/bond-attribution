@@ -75,6 +75,10 @@ def pca_attribution(bond: BondSpec, curve_hist: YieldCurveHistory,
          This ensures the total PC PnL sums to the full market impact when
          the retained PCs explain all the yield change.
       4. Residual = Actual − Carry − PC Total
+
+    PCA is fitted on centered yield changes. The sample mean curve drift is
+    intentionally not displayed as a separate PnL bucket; it remains in the
+    residual together with omitted components and non-linear effects.
     """
     dates = curve_hist.business_dates(start, end)
     changes_df = curve_hist.changes()
@@ -126,25 +130,16 @@ def pca_attribution(bond: BondSpec, curve_hist: YieldCurveHistory,
 
         # Sequential repricing:
         #   1) Start from curve_prev
-        #   2) Apply mean shift (systematic drift) → "Mean" bucket
-        #   3) Apply each PC shift cumulatively → PC k buckets
-        #   Residual captures unexplained PCs + non-linearities
+        #   2) Apply each retained centered PC shift cumulatively
+        #   3) Residual absorbs mean drift, omitted PCs, and non-linearities
         pv_base = pv_prev
         row = {"Date": d_curr.strftime("%Y-%m-%d"),
                "Actual PnL": round(actual, 6),
                "Carry": round(carry, 6)}
 
-        # Mean component: the average daily curve drift
-        curve_mean = YieldCurve(cp.date,
-                                cp.yields_pct + pca_res.mean_change)
-        pv_mean = bond.dirty_price(d_prev, curve_mean)
-        mean_pnl = pv_mean - pv_base
-        row["Mean PnL"] = round(mean_pnl, 6)
-        pv_base = pv_mean
-
         # PC components
-        pc_tot = mean_pnl
-        cumul_shift_pct = pca_res.mean_change.copy()  # start from mean
+        pc_tot = 0.0
+        cumul_shift_pct = np.zeros_like(pca_res.mean_change)
         for k in range(pca_res.n_components):
             pc_shift_pct = scores[k] * loadings[k]  # (n_tenors,) in %
             cumul_shift_pct = cumul_shift_pct + pc_shift_pct
