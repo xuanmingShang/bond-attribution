@@ -42,11 +42,11 @@ Applies PCA to daily Treasury yield-curve changes and attributes PnL to:
 - **PC3**: curvature change
 
 ### 3. Bond Ladder Backtest
-Builds a synthetic Treasury ladder and evaluates:
+Builds synthetic Treasury ladders and evaluates:
 
 - portfolio value evolution
 - attribution by component
-- rebalance behavior
+- Classic Roll, Withdrawal, and Immunized strategy modes
 - residual quality
 
 ### 4. Multi-Year Analysis
@@ -57,7 +57,7 @@ The `Streamlit` dashboard provides:
 
 - **Field**: yield-curve surface and selected-date curve snapshot
 - **Attribution**: Core, PCA, and Compare views in one workflow
-- **Ladder**: bond ladder backtest metrics, charts, holdings, and rebalance log
+- **Ladder**: switchable Classic Roll, Withdrawal, and Immunized ladder views
 
 ## Repository Structure
 
@@ -195,7 +195,17 @@ python -m pytest tests/ -q
 
 Current status:
 
-- **56 tests passing**
+- **63 tests passing**
+
+## Changelog
+
+### 2026-06-02
+
+- Reorganized the Streamlit dashboard into cleaner Field, Attribution, and Ladder workflows.
+- Improved Field snapshot selection with a calendar input and stabilized dashboard controls.
+- Removed separate PCA mean PnL handling by folding mean drift into Residual.
+- Updated Core cumulative attribution so Actual PnL renders as a solid line.
+- Rebuilt Ladder around Classic Roll, Withdrawal, and Immunized strategy modes with switchable UI support.
 
 ## Documentation
 
