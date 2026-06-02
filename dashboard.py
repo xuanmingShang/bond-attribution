@@ -412,7 +412,7 @@ def plot_cumulative_components(df: pd.DataFrame) -> go.Figure:
                 line=dict(
                     color=comp_colors.get(component, "#64748b"),
                     width=3 if is_actual else 1.5,
-                    dash="dash" if is_actual else "solid",
+                    dash="solid",
                 ),
             )
         )
