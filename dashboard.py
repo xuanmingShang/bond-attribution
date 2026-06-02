@@ -692,17 +692,23 @@ def _selected_date_from_surface_event(event: Any, surface_dates: list[str]) -> s
     return None
 
 
-def _date_options(ydf: pd.DataFrame) -> list[str]:
-    return [str(d.date()) for d in ydf.index]
-
-
-def _ensure_session_date(key: str, options: list[str], preferred: str) -> None:
-    if not options:
+def _ensure_session_calendar_date(key: str, ydf: pd.DataFrame, preferred: str) -> None:
+    if ydf.empty:
         return
-    if preferred not in options:
-        preferred = options[-1]
-    if st.session_state.get(key) not in options:
-        st.session_state[key] = preferred
+    preferred_date = pd.Timestamp(preferred).date()
+    min_date = ydf.index.min().date()
+    max_date = ydf.index.max().date()
+    if preferred_date < min_date or preferred_date > max_date:
+        preferred_date = max_date
+
+    current = st.session_state.get(key)
+    if current is None:
+        st.session_state[key] = preferred_date
+        return
+
+    current_date = pd.Timestamp(current).date()
+    if current_date < min_date or current_date > max_date:
+        st.session_state[key] = preferred_date
 
 
 def _load_yield_window(start_date, end_date, minimum_days: int, label: str):
@@ -805,16 +811,21 @@ def _render_field_tab() -> None:
         event = _render_plotly_with_optional_selection(surface_fig, key="field_surface")
         selected_from_surface = _selected_date_from_surface_event(event, surface_dates)
         if selected_from_surface:
-            st.session_state["field_snapshot_date"] = selected_from_surface
+            st.session_state["field_snapshot_date"] = pd.Timestamp(selected_from_surface).date()
         if not _supports_plotly_selection():
             muted_note("This Streamlit version does not expose Plotly selection events. Use the date selector.")
 
     with right:
-        options = _date_options(ydf)
-        _ensure_session_date("field_snapshot_date", options, preferred=end)
-        selected_date = st.selectbox("Snapshot date", options, key="field_snapshot_date")
+        _ensure_session_calendar_date("field_snapshot_date", ydf, preferred=end)
+        selected_calendar_date = st.date_input(
+            "Snapshot date",
+            key="field_snapshot_date",
+            min_value=ydf.index.min().date(),
+            max_value=ydf.index.max().date(),
+        )
+        selected_idx = ydf.index.get_indexer([pd.Timestamp(selected_calendar_date)], method="nearest")[0]
+        selected_date = str(ydf.index[selected_idx].date())
         st.plotly_chart(plot_yield_curve_snapshot(ydf, selected_date), use_container_width=True)
-        selected_idx = ydf.index.get_indexer([pd.Timestamp(selected_date)], method="nearest")[0]
         selected_row = ydf.iloc[selected_idx]
         s1, s2, s3 = st.columns(3)
         s1.metric("2Y", f"{selected_row['2Y']:.2f}%")
