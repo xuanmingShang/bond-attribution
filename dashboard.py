@@ -123,6 +123,7 @@ DEFAULT_START = pd.Timestamp("2023-06-01")
 DEFAULT_END = pd.Timestamp("2024-06-30")
 DEFAULT_LADDER_RUNGS = tuple(DEFAULT_RUNGS)
 FREQ_LABELS = {1: "Annual", 2: "Semi-annual", 4: "Quarterly"}
+FREQ_VALUES = {label: value for value, label in FREQ_LABELS.items()}
 
 
 def section_header(text: str) -> None:
@@ -1035,13 +1036,13 @@ def _render_attribution_tab() -> None:
     with c5:
         face_value = st.number_input("Face Value ($)", 10.0, 10000.0, 100.0, step=10.0, key="attr_face")
     with c6:
-        freq = st.selectbox(
+        freq_label = st.selectbox(
             "Coupon Frequency",
-            [2, 1, 4],
+            ["Semi-annual", "Annual", "Quarterly"],
             index=0,
-            format_func=lambda x: FREQ_LABELS[x],
             key="attr_freq",
         )
+        freq = FREQ_VALUES[freq_label]
     with c7:
         run_pca = st.checkbox("Compute PCA", value=True, key="attr_run_pca")
     with c8:
