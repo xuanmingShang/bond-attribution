@@ -55,11 +55,9 @@ Runs the same framework across multiple historical market windows for regime com
 ### 5. Interactive Dashboard
 The `Streamlit` dashboard provides:
 
-- yield curve visualization
-- attribution charts
-- PCA charts
-- ladder backtest charts
-- side-by-side comparison panels
+- **Field**: yield-curve surface and selected-date curve snapshot
+- **Attribution**: Core, PCA, and Compare views in one workflow
+- **Ladder**: bond ladder backtest metrics, charts, holdings, and rebalance log
 
 ## Repository Structure
 
@@ -163,7 +161,7 @@ python main.py --core-only
 ### Launch the dashboard
 
 ```bash
-streamlit run dashboard.py
+python -m streamlit run dashboard.py
 ```
 
 ### Download more FRED data

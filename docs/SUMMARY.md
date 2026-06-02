@@ -92,7 +92,7 @@ pip install -r requirements.txt
 python main.py
 
 # Launch interactive dashboard
-streamlit run dashboard.py
+python -m streamlit run dashboard.py
 
 # Multi-year cross-regime comparison
 python run_multi_year.py
@@ -100,11 +100,9 @@ python run_multi_year.py
 
 ## Dashboard Features
 
-- **Yield Curve**: 3D surface, snapshots, heatmap, daily changes
-- **Core Attribution**: Cumulative PnL, waterfall, components, daily distribution
-- **PCA Analysis**: Variance explained, factor loadings, PCA attribution waterfall
-- **Ladder Backtest**: Portfolio value, attribution, holdings, rebalance log
-- **Comparison**: Side-by-side Traditional vs PCA on unified categories
+- **Field**: 3D yield-curve surface and selected-date curve snapshot
+- **Attribution**: Core, PCA, and Compare views in one workflow
+- **Ladder**: Portfolio value, attribution, holdings, and rebalance log
 
 ## Test Coverage
 
