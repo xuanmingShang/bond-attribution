@@ -23,7 +23,7 @@ from plotly.subplots import make_subplots
 
 from bond_pnl.attribution import attribution_summary, run_attribution
 from bond_pnl.bond import BondSpec
-from bond_pnl.ladder import DEFAULT_RUNGS, LadderBacktest
+from bond_pnl.ladder import DEFAULT_RUNGS, IMMUNIZED_RUNGS, LadderBacktest
 from bond_pnl.pca import fit_pca, pca_attribution
 from bond_pnl.utils import snap_to_business_day
 from bond_pnl.yield_curve import (
@@ -122,6 +122,12 @@ COLORS = {
 DEFAULT_START = pd.Timestamp("2023-06-01")
 DEFAULT_END = pd.Timestamp("2024-06-30")
 DEFAULT_LADDER_RUNGS = tuple(DEFAULT_RUNGS)
+DEFAULT_IMMUNIZED_RUNGS = tuple(IMMUNIZED_RUNGS)
+LADDER_STRATEGIES = {
+    "Classic Roll": "classic",
+    "Withdrawal": "withdrawal",
+    "Immunized": "immunized",
+}
 FREQ_LABELS = {1: "Annual", 2: "Semi-annual", 4: "Quarterly"}
 FREQ_VALUES = {label: value for value, label in FREQ_LABELS.items()}
 
@@ -218,13 +224,36 @@ def compute_ladder(
     start: str,
     end: str,
     capital: float,
-    rebal_months: int,
     rungs: tuple[int, ...],
+    strategy: str,
+    withdrawal_amount: float,
+    withdrawal_frequency: str,
+    first_withdrawal_date: str | None,
+    target_mode: str,
+    target_duration: float | None,
+    liability_date: str | None,
+    liability_amount: float | None,
 ):
     ydf = pd.read_json(StringIO(ydf_json))
     ch = YieldCurveHistory(ydf)
     financing_rate = ch[start].rate(0.25)
-    bt = LadderBacktest(ch, start, end, list(rungs), capital, rebal_months, financing_rate)
+    bt = LadderBacktest(
+        ch,
+        start,
+        end,
+        list(rungs),
+        capital,
+        12,
+        financing_rate,
+        strategy=strategy,
+        withdrawal_amount=withdrawal_amount,
+        withdrawal_frequency=withdrawal_frequency,
+        first_withdrawal_date=first_withdrawal_date,
+        target_mode=target_mode,
+        target_duration=target_duration,
+        liability_date=liability_date,
+        liability_amount=liability_amount,
+    )
     return bt.run()
 
 
@@ -578,6 +607,17 @@ def plot_ladder_portfolio(ts: pd.DataFrame) -> go.Figure:
         ),
         secondary_y=False,
     )
+    if "Cash Balance" in ts.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=ts.index,
+                y=ts["Cash Balance"],
+                mode="lines",
+                name="Cash Balance",
+                line=dict(color=COLORS["warning"], width=1.8, dash="dot"),
+            ),
+            secondary_y=False,
+        )
     fig.add_trace(
         go.Scatter(
             x=ts.index,
@@ -592,6 +632,61 @@ def plot_ladder_portfolio(ts: pd.DataFrame) -> go.Figure:
     fig.update_yaxes(title_text="Cumulative Return (%)", secondary_y=True)
     fig.update_layout(title="Ladder Portfolio Value and Return")
     return _plotly_defaults(fig, 430)
+
+
+def plot_ladder_cashflows(ts: pd.DataFrame) -> go.Figure:
+    columns = [
+        ("Coupon Cashflow", COLORS["accrual"]),
+        ("Principal Cashflow", COLORS["primary"]),
+        ("Withdrawal Paid", COLORS["success"]),
+        ("Withdrawal Shortfall", COLORS["danger"]),
+    ]
+    fig = go.Figure()
+    for column, color in columns:
+        if column in ts.columns and ts[column].abs().sum() > 0:
+            fig.add_trace(
+                go.Bar(
+                    x=ts.index,
+                    y=ts[column],
+                    name=column,
+                    marker_color=color,
+                )
+            )
+    fig.update_layout(
+        title="Ladder Cashflows",
+        xaxis_title="Date",
+        yaxis_title="Cashflow ($)",
+        barmode="group",
+    )
+    return _plotly_defaults(fig, 360)
+
+
+def plot_ladder_duration_match(match_ts: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if match_ts.empty:
+        fig.update_layout(title="Portfolio Duration")
+        return _plotly_defaults(fig, 360)
+    fig.add_trace(
+        go.Scatter(
+            x=match_ts.index,
+            y=match_ts["Portfolio Duration"],
+            mode="lines",
+            name="Portfolio Duration",
+            line=dict(color=COLORS["primary"], width=2.2),
+        )
+    )
+    if "Target Duration" in match_ts.columns and match_ts["Target Duration"].notna().any():
+        fig.add_trace(
+            go.Scatter(
+                x=match_ts.index,
+                y=match_ts["Target Duration"],
+                mode="lines",
+                name="Target Duration",
+                line=dict(color=COLORS["danger"], width=2, dash="dash"),
+            )
+        )
+    fig.update_layout(title="Duration Profile", xaxis_title="Date", yaxis_title="Duration")
+    return _plotly_defaults(fig, 360)
 
 
 def plot_ladder_attribution(at: pd.DataFrame) -> go.Figure:
@@ -1099,20 +1194,49 @@ def _render_attribution_tab() -> None:
         _render_compare_view(core_summary, pca_attr)
 
 
-def _run_ladder_workflow(start_date, end_date, capital: float, rebal_months: int) -> None:
+def _run_ladder_workflow(
+    start_date,
+    end_date,
+    capital: float,
+    strategy_label: str,
+    withdrawal_amount: float,
+    withdrawal_frequency: str,
+    first_withdrawal_date,
+    target_mode_label: str,
+    target_duration: float | None,
+    liability_date,
+    liability_amount: float | None,
+) -> None:
     loaded = _load_yield_window(start_date, end_date, minimum_days=10, label="Ladder")
     if loaded is None:
         return
 
     ydf, start_snap, end_snap = loaded
+    strategy = LADDER_STRATEGIES[strategy_label]
+    rungs = DEFAULT_IMMUNIZED_RUNGS if strategy == "immunized" else DEFAULT_LADDER_RUNGS
+    target_mode = "liability" if target_mode_label == "Liability" else "target_duration"
+    first_withdrawal = None
+    if strategy == "withdrawal" and first_withdrawal_date is not None:
+        first_withdrawal = pd.Timestamp(first_withdrawal_date).strftime("%Y-%m-%d")
+    liability_date_str = None
+    if strategy == "immunized" and target_mode == "liability" and liability_date is not None:
+        liability_date_str = pd.Timestamp(liability_date).strftime("%Y-%m-%d")
+
     with st.spinner("Running ladder backtest..."):
         ladder_result = compute_ladder(
             ydf.to_json(),
             start_snap,
             end_snap,
             capital,
-            rebal_months,
-            DEFAULT_LADDER_RUNGS,
+            rungs,
+            strategy,
+            float(withdrawal_amount if strategy == "withdrawal" else 0.0),
+            withdrawal_frequency,
+            first_withdrawal,
+            target_mode,
+            float(target_duration) if strategy == "immunized" and target_mode == "target_duration" else None,
+            liability_date_str,
+            float(liability_amount) if strategy == "immunized" and target_mode == "liability" else None,
         )
     st.session_state["ladder_results"] = {
         "ydf": ydf,
@@ -1120,30 +1244,115 @@ def _run_ladder_workflow(start_date, end_date, capital: float, rebal_months: int
         "start": start_snap,
         "end": end_snap,
         "capital": capital,
-        "rebal_months": rebal_months,
+        "strategy_label": strategy_label,
+        "strategy": strategy,
+        "rungs": rungs,
     }
 
 
 def _render_ladder_tab() -> None:
     section_header("Ladder Parameters")
-    c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+    strategy_label = _view_selector("Strategy", list(LADDER_STRATEGIES.keys()), key="ladder_strategy")
+
+    c1, c2, c3 = st.columns([1, 1, 1])
     with c1:
         start_date = st.date_input("Start", DEFAULT_START, key="ladder_start")
     with c2:
         end_date = st.date_input("End", DEFAULT_END, key="ladder_end")
     with c3:
         capital = st.number_input("Capital ($)", 100_000, 100_000_000, 1_000_000, step=100_000, key="ladder_capital")
-    with c4:
-        rebal_months = st.selectbox("Rebalance (months)", [6, 12, 24], index=1, key="ladder_rebal")
+
+    withdrawal_amount = 0.0
+    withdrawal_frequency = "Annual"
+    first_withdrawal_date = None
+    target_mode_label = "Target duration"
+    target_duration = 5.0
+    liability_date = None
+    liability_amount = None
+
+    if strategy_label == "Withdrawal":
+        w1, w2, w3 = st.columns([1, 1, 1])
+        with w1:
+            withdrawal_amount = st.number_input(
+                "Withdrawal amount ($)",
+                0,
+                10_000_000,
+                25_000,
+                step=5_000,
+                key="ladder_withdrawal_amount",
+            )
+        with w2:
+            withdrawal_frequency = st.selectbox(
+                "Withdrawal frequency",
+                ["Monthly", "Quarterly", "Semiannual", "Annual"],
+                index=3,
+                key="ladder_withdrawal_frequency",
+            )
+        with w3:
+            first_withdrawal_date = st.date_input(
+                "First withdrawal",
+                start_date,
+                key="ladder_first_withdrawal",
+            )
+    elif strategy_label == "Immunized":
+        i1, i2, i3 = st.columns([1, 1, 1])
+        with i1:
+            target_mode_label = st.selectbox(
+                "Target mode",
+                ["Target duration", "Liability"],
+                index=0,
+                key="ladder_target_mode",
+            )
+        if target_mode_label == "Target duration":
+            with i2:
+                target_duration = st.number_input(
+                    "Target duration",
+                    0.5,
+                    30.0,
+                    5.0,
+                    step=0.25,
+                    key="ladder_target_duration",
+                )
+            with i3:
+                muted_note("Uses 1Y, 2Y, 3Y, 5Y, 7Y, 10Y, 20Y, 30Y candidates.")
+        else:
+            with i2:
+                liability_date = st.date_input(
+                    "Liability date",
+                    min(end_date, start_date + pd.DateOffset(years=5)),
+                    key="ladder_liability_date",
+                )
+            with i3:
+                liability_amount = st.number_input(
+                    "Liability amount ($)",
+                    100_000,
+                    100_000_000,
+                    1_000_000,
+                    step=100_000,
+                    key="ladder_liability_amount",
+                )
 
     r1, r2 = st.columns([2, 1])
     with r1:
-        muted_note("Rungs: " + ", ".join(f"{r}Y" for r in DEFAULT_LADDER_RUNGS))
+        rungs = DEFAULT_IMMUNIZED_RUNGS if strategy_label == "Immunized" else DEFAULT_LADDER_RUNGS
+        muted_note("Rungs: " + ", ".join(f"{r}Y" for r in rungs))
     with r2:
         run_btn = st.button("Run Ladder", type="primary", use_container_width=True, key="ladder_run")
 
     if run_btn:
-        _run_ladder_workflow(start_date, end_date, capital, rebal_months)
+        _run_ladder_workflow(
+            start_date,
+            end_date,
+            capital,
+            strategy_label,
+            withdrawal_amount,
+            withdrawal_frequency,
+            first_withdrawal_date,
+            target_mode_label,
+            target_duration,
+            liability_date,
+            liability_amount,
+        )
 
     if "ladder_results" not in st.session_state:
         st.info("Set ladder parameters and click Run Ladder.")
@@ -1153,6 +1362,8 @@ def _render_ladder_tab() -> None:
     ladder_result = result["ladder_result"]
     ts = ladder_result["portfolio_ts"]
     attribution = ladder_result["attribution"]
+    summary = ladder_result.get("summary", {})
+    strategy = result.get("strategy", "classic")
 
     section_header("Ladder Summary")
     final_value = ts["Portfolio Value"].iloc[-1]
@@ -1170,13 +1381,35 @@ def _render_ladder_tab() -> None:
     m4.metric("Max Drawdown", f"{max_drawdown * 100:.2f}%")
     muted_note(f"Results shown for {result['start']} to {result['end']}.")
 
+    s1, s2, s3, s4 = st.columns(4)
+    s1.metric("Cash Balance", f"${summary.get('Cash Balance', ts.get('Cash Balance', pd.Series([0])).iloc[-1]):,.0f}")
+    s2.metric("Bond Market Value", f"${summary.get('Bond Market Value', ts.get('Bond Market Value', pd.Series([0])).iloc[-1]):,.0f}")
+    s3.metric("Portfolio Duration", f"{summary.get('Portfolio Duration', 0):.2f}")
+    if strategy == "withdrawal":
+        s4.metric("Shortfall", f"${summary.get('Total Shortfall', 0):,.0f}")
+    elif strategy == "immunized":
+        match_ts = ladder_result.get("match_ts", pd.DataFrame())
+        gap = match_ts["Duration Gap"].dropna().iloc[-1] if not match_ts.empty and match_ts["Duration Gap"].notna().any() else 0.0
+        s4.metric("Duration Gap", f"{gap:.2f}")
+    else:
+        s4.metric("Total Par", f"${summary.get('Total Par', 0):,.0f}")
+
     st.plotly_chart(plot_ladder_portfolio(ts), use_container_width=True)
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(plot_ladder_attribution(attribution), use_container_width=True)
+        if any(col in ts.columns and ts[col].abs().sum() > 0 for col in ["Coupon Cashflow", "Principal Cashflow", "Withdrawal Paid", "Withdrawal Shortfall"]):
+            st.plotly_chart(plot_ladder_cashflows(ts), use_container_width=True)
+        else:
+            st.plotly_chart(plot_ladder_attribution(attribution), use_container_width=True)
     with c2:
-        st.plotly_chart(plot_ladder_waterfall(attribution), use_container_width=True)
+        match_ts = ladder_result.get("match_ts", pd.DataFrame())
+        if not match_ts.empty:
+            st.plotly_chart(plot_ladder_duration_match(match_ts), use_container_width=True)
+        else:
+            st.plotly_chart(plot_ladder_waterfall(attribution), use_container_width=True)
+
+    st.plotly_chart(plot_ladder_attribution(attribution), use_container_width=True)
 
     section_header("Current Holdings")
     holdings = ladder_result["holdings"]
@@ -1185,8 +1418,27 @@ def _render_ladder_tab() -> None:
     else:
         st.dataframe(holdings, use_container_width=True, hide_index=True)
 
-    with st.expander("Rebalance Log"):
-        st.dataframe(ladder_result["rebalance_log"], use_container_width=True, hide_index=True)
+    with st.expander("Activity / Roll Log"):
+        st.dataframe(ladder_result.get("trade_log", ladder_result["rebalance_log"]), use_container_width=True, hide_index=True)
+
+    cashflows = ladder_result.get("cashflows", pd.DataFrame())
+    if not cashflows.empty:
+        with st.expander("Coupon and Principal Cashflows"):
+            st.dataframe(cashflows, use_container_width=True, hide_index=True)
+
+    withdrawals = ladder_result.get("withdrawals", pd.DataFrame())
+    if not withdrawals.empty:
+        with st.expander("Withdrawal Coverage"):
+            st.dataframe(withdrawals, use_container_width=True, hide_index=True)
+
+    rung_analytics = ladder_result.get("rung_analytics", pd.DataFrame())
+    if strategy == "immunized" and not rung_analytics.empty:
+        with st.expander("Immunized Rung Analytics", expanded=True):
+            st.dataframe(rung_analytics, use_container_width=True, hide_index=True)
+        target_log = ladder_result.get("target_log", pd.DataFrame())
+        if not target_log.empty:
+            with st.expander("Target Match Log"):
+                st.dataframe(target_log, use_container_width=True, hide_index=True)
 
 
 st.markdown(

@@ -24,7 +24,7 @@ from bond_pnl.yield_curve import fetch_yields, YieldCurveHistory
 from bond_pnl.bond import BondSpec
 from bond_pnl.attribution import run_attribution, attribution_summary
 from bond_pnl.pca import fit_pca, pca_attribution
-from bond_pnl.ladder import LadderBacktest
+from bond_pnl.ladder import DEFAULT_RUNGS, LadderBacktest
 
 OUT = Path(__file__).resolve().parent / "output" / "multi_year"
 
@@ -81,7 +81,7 @@ def run_window(start: str, end: str, label: str):
     print(f"  PCA: {var_expl:.1f}% explained  Res={pca_res:.4f}" if pca_res else "  PCA: N/A")
 
     # Ladder
-    bt = LadderBacktest(ch, actual_start, actual_end, [2, 5, 7, 10, 30], 1_000_000, 12, fr)
+    bt = LadderBacktest(ch, actual_start, actual_end, DEFAULT_RUNGS.copy(), 1_000_000, 12, fr)
     lr = bt.run()
     ts = lr["portfolio_ts"]
     lret = ts["Cumulative Return"].iloc[-1] * 100

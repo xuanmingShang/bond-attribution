@@ -20,7 +20,7 @@ from bond_pnl.yield_curve import fetch_yields, YieldCurveHistory
 from bond_pnl.bond import BondSpec
 from bond_pnl.attribution import run_attribution, attribution_summary
 from bond_pnl.pca import fit_pca, pca_attribution
-from bond_pnl.ladder import LadderBacktest
+from bond_pnl.ladder import DEFAULT_RUNGS, LadderBacktest
 
 OUT = Path(__file__).resolve().parent / "output"
 
@@ -159,7 +159,7 @@ def _plot_pca(pr, pa):
 # ═══════════════════════════════════════════════════════════════════════
 def run_ladder(ch, start, end):
     _hdr("OPTIONAL 2: Bond Ladder Backtest")
-    bt = LadderBacktest(ch, start, end, [2,5,7,10,30], 1_000_000.0, 12,
+    bt = LadderBacktest(ch, start, end, DEFAULT_RUNGS.copy(), 1_000_000.0, 12,
                         ch[start].rate(0.25))
     rs = bt.run()
     ts = rs["portfolio_ts"]
