@@ -4,7 +4,7 @@ A Python project for **U.S. Treasury bond PnL attribution**, including:
 
 - **Core attribution** under a Campisi-style framework
 - **PCA-based yield curve decomposition**
-- **Bond ladder backtest**
+- **Classic, Withdrawal, and Immunized bond ladder backtests**
 - **Multi-year cross-regime analysis**
 - **Interactive Streamlit dashboard**
 
@@ -40,14 +40,18 @@ Applies PCA to daily Treasury yield-curve changes and attributes PnL to:
 - **PC1**: level shift
 - **PC2**: slope change
 - **PC3**: curvature change
+- **Carry** and **Residual**
+
+The PCA model is fit on centered yield changes; mean curve drift is absorbed into
+Residual so the displayed components still add back to Actual PnL.
 
 ### 3. Bond Ladder Backtest
 Builds synthetic Treasury ladders and evaluates:
 
-- portfolio value evolution
-- attribution by component
-- Classic Roll, Withdrawal, and Immunized strategy modes
-- residual quality
+- **Classic Roll**: 1Y-5Y hold-to-maturity ladder; matured principal rolls into the longest rung.
+- **Withdrawal**: periodic spending schedule using coupon and principal cash flows, with shortfall tracking.
+- **Immunized**: duration- or liability-targeted ladder using wider 1Y-30Y candidate rungs.
+- Portfolio value, cash balance, attribution, holdings, activity log, cashflow log, and target-match diagnostics.
 
 ### 4. Multi-Year Analysis
 Runs the same framework across multiple historical market windows for regime comparison.
@@ -55,9 +59,9 @@ Runs the same framework across multiple historical market windows for regime com
 ### 5. Interactive Dashboard
 The `Streamlit` dashboard provides:
 
-- **Field**: yield-curve surface and selected-date curve snapshot
+- **Field**: 3D yield-curve surface and calendar-selected curve snapshot
 - **Attribution**: Core, PCA, and Compare views in one workflow
-- **Ladder**: switchable Classic Roll, Withdrawal, and Immunized ladder views
+- **Ladder**: single-select switching between Classic Roll, Withdrawal, and Immunized views
 
 ## Repository Structure
 
