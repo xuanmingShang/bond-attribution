@@ -225,31 +225,23 @@ class LadderBacktest:
         """Create a synthetic par bond for *rung* at *settle*."""
         c = self.curve_history[settle]
         mat = settle + pd.DateOffset(years=int(rung))
-        guess = c.rate(float(rung))
-
-        def _price_at_cpn(cpn):
-            return BondSpec(
-                maturity=mat.strftime("%Y-%m-%d"),
-                face=100.0,
-                coupon=cpn,
-                freq=2,
-                day_count="ACT/ACT",
-                issue_date=settle.strftime("%Y-%m-%d"),
-            ).dirty_price(settle, c)
-
-        lo = min(guess - 0.05, -0.05)
-        hi = max(abs(guess) * 3, 0.10) + 0.01
-        while _price_at_cpn(hi) < 100.0:
-            hi *= 2
-        while _price_at_cpn(lo) >= 100.0:
-            lo -= 0.05
-        for _ in range(80):
-            mid_c = (lo + hi) / 2.0
-            if _price_at_cpn(mid_c) < 100.0:
-                lo = mid_c
-            else:
-                hi = mid_c
-        par_cpn = round((lo + hi) / 2.0, 6)
+        template = BondSpec(
+            maturity=mat.strftime("%Y-%m-%d"),
+            face=100.0,
+            coupon=0.0,
+            freq=2,
+            day_count="ACT/ACT",
+            issue_date=settle.strftime("%Y-%m-%d"),
+        )
+        times, _ = template._cashflow_arrays(settle)
+        if len(times) == 0:
+            raise RuntimeError(f"No cashflows for {rung}Y par bond at {settle}")
+        discount = np.exp(-c.rates(times) * times)
+        principal_pv = template.face * discount[-1]
+        coupon_annuity = template.face / template.freq * discount.sum()
+        if abs(coupon_annuity) <= 1e-12:
+            raise RuntimeError(f"Par bond coupon annuity is zero for {rung}Y at {settle}")
+        par_cpn = round((template.face - principal_pv) / coupon_annuity, 8)
         result = BondSpec(
             maturity=mat.strftime("%Y-%m-%d"),
             face=100.0,
@@ -271,10 +263,11 @@ class LadderBacktest:
         rows = []
         for rung in self.rungs:
             bond = self._make_bond(rung, settle)
-            price = bond.dirty_price(settle, curve)
-            duration = bond.modified_duration(settle, curve)
-            dv01 = bond.dv01(settle, curve)
-            convexity = bond.convexity_dollar(settle, curve)
+            risk = bond.risk_measures(settle, curve)
+            price = risk["dirty_price"]
+            duration = risk["modified_duration"]
+            dv01 = risk["dv01"]
+            convexity = risk["convexity_dollar"]
             if not np.isfinite([price, duration, dv01, convexity]).all():
                 continue
             rows.append(
@@ -636,13 +629,13 @@ class LadderBacktest:
         for h in self.holdings:
             if dt >= h.bond.maturity_dt:
                 continue
-            price = h.bond.dirty_price(dt, curve)
+            risk = h.bond.risk_measures(dt, curve)
+            price = risk["dirty_price"]
             mv = h.quantity * price / 100.0
-            duration = h.bond.modified_duration(dt, curve)
             bond_value += mv
-            duration_value += mv * duration
-            dollar_dv01 += h.quantity * h.bond.dv01(dt, curve) / 100.0
-            convexity += h.quantity * h.bond.convexity_dollar(dt, curve) / 100.0
+            duration_value += mv * risk["modified_duration"]
+            dollar_dv01 += h.quantity * risk["dv01"] / 100.0
+            convexity += h.quantity * risk["convexity_dollar"] / 100.0
         portfolio_duration = duration_value / bond_value if bond_value else 0.0
         return {
             "Portfolio Duration": portfolio_duration,
@@ -868,8 +861,9 @@ class LadderBacktest:
         for h in self.holdings:
             if dt >= h.bond.maturity_dt:
                 continue
-            dirty = h.bond.dirty_price(dt, curve)
-            clean = h.bond.clean_price(dt, curve)
+            risk = h.bond.risk_measures(dt, curve)
+            dirty = risk["dirty_price"]
+            clean = dirty - h.bond.accrued_interest(dt)
             mv = h.quantity * dirty / 100.0
             rows.append(
                 {
@@ -885,9 +879,9 @@ class LadderBacktest:
                     "Market Value": round(mv, 2),
                     "Weight": round(mv / comps["Portfolio Value"], 6) if comps["Portfolio Value"] else np.nan,
                     "Years To Maturity": round((h.bond.maturity_dt - dt).days / 365.25, 4),
-                    "DV01": round(h.quantity * h.bond.dv01(dt, curve) / 100.0, 6),
-                    "Modified Duration": round(h.bond.modified_duration(dt, curve), 6),
-                    "Convexity Dollar": round(h.quantity * h.bond.convexity_dollar(dt, curve) / 100.0, 6),
+                    "DV01": round(h.quantity * risk["dv01"] / 100.0, 6),
+                    "Modified Duration": round(risk["modified_duration"], 6),
+                    "Convexity Dollar": round(h.quantity * risk["convexity_dollar"] / 100.0, 6),
                 }
             )
         return pd.DataFrame(rows)
