@@ -12,6 +12,10 @@ fred-api-key.txt
 data/
 output/
 
+# Local/private documentation
+docs/
+streamlit-dashboard-decisions.md
+
 # Test / cache
 .pytest_cache/
 .mypy_cache/
