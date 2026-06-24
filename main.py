@@ -218,7 +218,7 @@ def main():
     ap.add_argument("--start", default="2023-06-01")
     ap.add_argument("--end",   default="2024-06-30")
     ap.add_argument("--core-only", action="store_true")
-    ap.add_argument("--coupon", type=float, default=None, help="Coupon %")
+    ap.add_argument("--coupon", type=float, default=None, help="Coupon rate in percent")
     ap.add_argument("--maturity-years", type=int, default=5)
     a = ap.parse_args()
 

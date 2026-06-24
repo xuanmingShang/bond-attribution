@@ -8,7 +8,7 @@ A Python project for **U.S. Treasury bond PnL attribution**, including:
 - **Multi-year cross-regime analysis**
 - **Interactive Streamlit dashboard**
 
-This repository was built for a course/project setting and is designed to be both **analytically correct** and **presentation-friendly**.
+The project is designed to be reproducible from public FRED data and usable from both command-line scripts and an interactive dashboard.
 
 ## Features
 
@@ -74,12 +74,10 @@ CS7320/
 │  ├─ pca.py
 │  ├─ utils.py
 │  └─ yield_curve.py
-├─ docs/
-│  ├─ EXPLANATION.md
-│  └─ SUMMARY.md
 ├─ tests/
 ├─ dashboard.py
 ├─ download_data.py
+├─ LICENSE
 ├─ main.py
 ├─ requirements.txt
 └─ run_multi_year.py
@@ -107,8 +105,8 @@ Main dependencies are listed in `requirements.txt`, including:
 ### 1. Clone the repository
 
 ```bash
-git clone <your-github-repo-url>
-cd CS7320
+git clone https://github.com/xuanmingShang/bond-attribution.git
+cd bond-attribution
 ```
 
 ### 2. Install dependencies
@@ -211,7 +209,6 @@ Current status:
 - Updated Core cumulative attribution so Actual PnL renders as a solid line.
 - Rebuilt Ladder around Classic Roll, Withdrawal, and Immunized strategy modes with switchable UI support.
 
-## Documentation
+## License
 
-- `docs/EXPLANATION.md`: detailed Chinese explanation from basics to implementation details
-- `docs/SUMMARY.md`: English executive summary
+This project is released under the MIT License. See `LICENSE` for details.

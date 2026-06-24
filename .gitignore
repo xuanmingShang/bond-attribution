@@ -15,6 +15,7 @@ output/
 # Local/private documentation
 docs/
 streamlit-dashboard-decisions.md
+todo.md
 
 # Test / cache
 .pytest_cache/

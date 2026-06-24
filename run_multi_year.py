@@ -78,7 +78,7 @@ def run_window(start: str, end: str, label: str):
     pa = pca_attribution(bond, ch, pr, actual_start, actual_end, fr)
     pca_res = pa.sum().get("Residual", 0) if not pa.empty else None
     var_expl = pr.cumulative_variance[-1] * 100
-    print(f"  PCA: {var_expl:.1f}% explained  Res={pca_res:.4f}" if pca_res else "  PCA: N/A")
+    print(f"  PCA: {var_expl:.1f}% explained  Res={pca_res:.4f}" if pca_res is not None else "  PCA: N/A")
 
     # Ladder
     bt = LadderBacktest(ch, actual_start, actual_end, DEFAULT_RUNGS.copy(), 1_000_000, 12, fr)
