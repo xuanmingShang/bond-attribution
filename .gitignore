@@ -16,6 +16,7 @@ output/
 docs/
 streamlit-dashboard-decisions.md
 todo.md
+tests/
 
 # Test / cache
 .pytest_cache/

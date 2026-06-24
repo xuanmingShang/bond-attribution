@@ -74,7 +74,6 @@ CS7320/
 │  ├─ pca.py
 │  ├─ utils.py
 │  └─ yield_curve.py
-├─ tests/
 ├─ dashboard.py
 ├─ download_data.py
 ├─ LICENSE
@@ -98,7 +97,6 @@ Main dependencies are listed in `requirements.txt`, including:
 - `scikit-learn`
 - `streamlit`
 - `plotly`
-- `pytest`
 
 ## Setup
 
@@ -186,18 +184,6 @@ Generated analysis files are typically written to:
 - `data/`
 
 These directories are intentionally ignored in Git because they are reproducible artifacts.
-
-## Testing
-
-Run the test suite with:
-
-```bash
-python -m pytest tests/ -q
-```
-
-Current status:
-
-- **63 tests passing**
 
 ## Changelog
 
